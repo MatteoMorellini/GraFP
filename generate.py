@@ -19,9 +19,9 @@ from modules.transformations import GPUTransformNeuralfp
 parser = argparse.ArgumentParser(description='GraFPrint Embedding generation')
 parser.add_argument('--config', default='config/grafp.yaml', type=str,
                     help='Path to config file')
-parser.add_argument('--ckp', default=None, type=str,
+parser.add_argument('--ckp', default='/content/drive/MyDrive/GraFP/checkpoint/model_tc_27_best.pth', type=str,
                     help='Path to checkpoint file')
-parser.add_argument('--test_dir', default=None, type=str,
+parser.add_argument('--test_dir', default='/content/drive/MyDrive/GraFP/fma_small', type=str,
                     help='Path to audio directory or index file')
 parser.add_argument('--output_dir', default='output', type=str,
                     help='Path to output directory')
@@ -54,6 +54,8 @@ def create_db(dataloader, model, augment, output_dir, concat=True, max_size=128)
         fp = np.concatenate(fp, axis=0)
     else:
         fp = np.array(fp)
+
+    os.makedirs("output", exist_ok=True)
     np.save(os.path.join(output_dir, "fingerprints.npy"), fp)
     
 
@@ -79,7 +81,7 @@ def main():
                                             num_workers=4, 
                                             pin_memory=True, 
                                             drop_last=False)
-    
+                                            
     # dummy augment; will not apply any transformations
     augment = GPUTransformNeuralfp(cfg=cfg, ir_dir=None, 
                                         noise_dir=None, 

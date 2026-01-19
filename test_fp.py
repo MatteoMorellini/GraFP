@@ -11,6 +11,9 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.parallel import DataParallel
 import torchaudio
+import warnings
+warnings.filterwarnings("ignore")
+
 torchaudio.set_audio_backend("soundfile")
 
 
@@ -37,7 +40,7 @@ parser.add_argument('--config', default='config/grafp.yaml', type=str,
 parser.add_argument('--test_config', default='config/test_config.yaml', type=str)
 parser.add_argument('--seed', default=42, type=int,
                     help='seed for initializing testing. ')
-parser.add_argument('--test_dir', default='data/fma_medium.json', type=str,
+parser.add_argument('--test_dir', default='data/fma_small.json', type=str,
                     help='path to test data')
 parser.add_argument('--noise_idx', default=None, type=str)
 parser.add_argument('--noise_split', default='all', type=str,
@@ -177,8 +180,7 @@ def main():
 
     # Hyperparameters
     random_seed = 42
-    shuffle_dataset = args.shuffle
-    assert shuffle_dataset is False
+    shuffle_dataset = True
 
     ############# ablation experimental setup #################
     if args.model is not None:
@@ -212,14 +214,12 @@ def main():
             model = model.to(device)
 
     print("Creating dataloaders ...")
-
     # Augmentation for testing with specific noise subsets
     if args.noise_idx is not None:
         noise_test_idx = load_augmentation_index(noise_dir, json_path=args.noise_idx, splits=0.8)[args.noise_split]
     else:
         noise_test_idx = load_augmentation_index(noise_dir, splits=0.8)["test"]
     ir_test_idx = load_augmentation_index(ir_dir, splits=0.8)["test"]
-
     if "sanir" in args.text:
         print("Queries without IR augmentation!")
         test_augment = GPUTransformNeuralfp(cfg=cfg, ir_dir=ir_test_idx, 
@@ -280,7 +280,6 @@ def main():
         test_seq_len = [query_len_from_seconds(q, cfg['overlap'], dur=cfg['dur'])
                         for q in args.query_lens]
         
-
     for ckp_name, epochs in test_cfg.items():
         if not type(epochs) == list:
             epochs = [epochs]

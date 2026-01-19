@@ -2,8 +2,8 @@
 data_dir: 'data'
 train_dir: 'PATH/TO/TRAINING/DATA'
 val_dir: 'PATH/TO/VALIDATION/DATA'
-ir_dir: 'PATH/TO/IR/DATA'
-noise_dir: 'PATH/TO/NOISE/DATA'
+ir_dir: 'aug/ir'
+noise_dir: 'aug/noise'
 
 
 # Model input parameters
