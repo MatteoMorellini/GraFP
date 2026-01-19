@@ -8,7 +8,8 @@ import numpy as np
 import librosa
 import torch.nn as nn
 import warnings
-
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3
 from util import load_index, get_frames, qtile_normalize, qtile_norm
 
 
@@ -24,7 +25,7 @@ class NeuralfpDataset(Dataset):
         self.n_frames = cfg['n_frames']
         self.silence = cfg['silence']
         self.error_threshold = cfg['error_threshold']
-
+        print(f'path is {path}')
         if train:
             self.filenames = load_index(cfg, path, mode="train")
         else:
@@ -37,12 +38,15 @@ class NeuralfpDataset(Dataset):
     def __getitem__(self, idx):
         if idx in self.ignore_idx:
             return self[idx + 1]
-        
         datapath = self.filenames[str(idx)]
         try:
             # with warnings.catch_warnings():
             #     warnings.simplefilter("ignore")
             audio, sr = torchaudio.load(datapath)
+            meta = MP3(datapath, ID3=ID3)
+
+            #print('Song:', audio_meta.tags["TIT2"].text[0], '\nAlbum:', audio_meta.tags["TPE1"].text[0], '\nArtist:', audio_meta.tags["TALB"].text[0])
+            # Title - album, artist
 
         except Exception:
             print("Error loading:" + self.filenames[str(idx)])
@@ -110,7 +114,7 @@ class NeuralfpDataset(Dataset):
         
         #   For validation / test, output consecutive (overlapping) frames
         else:
-            return audio_resampled
+            return audio_resampled, meta
             # return audio_resampled
     
     def __len__(self):

@@ -91,7 +91,7 @@ def create_fp_db(dataloader, augment, model, output_root_dir, verbose=True):
     fp_q = []
     fp_db = []
     print("=> Creating query and db fingerprints...")
-    for idx, audio in enumerate(dataloader):
+    for idx, (audio, meta) in enumerate(dataloader):
         audio = audio.to(device)
         x_i, x_j = augment(audio, audio)
         with torch.no_grad():
@@ -130,7 +130,7 @@ def create_fp_db(dataloader, augment, model, output_root_dir, verbose=True):
 def create_dummy_db(dataloader, augment, model, output_root_dir, fname='dummy_db', verbose=True):
     fp = []
     print("=> Creating dummy fingerprints...")
-    for idx, audio in enumerate(dataloader):
+    for idx, (audio, meta)  in enumerate(dataloader):
         audio = audio.to(device)
         x_i, _ = augment(audio, None)
         assert x_i.size(1) == 64 and len(x_i.size()) == 3, f"Shape of x_i: {x_i.shape}"

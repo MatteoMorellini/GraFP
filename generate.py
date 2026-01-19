@@ -34,7 +34,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def create_db(dataloader, model, augment, output_dir, concat=True, max_size=128):
     fp = []
     print("Computing fingerprints...")
-    for idx, audio in enumerate(dataloader):
+    for idx, (audio, meta) in enumerate(dataloader):
         audio = audio.to(device)
         x_i, _ = augment(audio, None)
         # Determining mini-batches for large audio files
