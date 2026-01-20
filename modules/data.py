@@ -114,7 +114,7 @@ class NeuralfpDataset(Dataset):
         
         #   For validation / test, output consecutive (overlapping) frames
         else:
-            return audio_resampled, meta
+            return audio_resampled, {'song': str(meta.tags["TIT2"].text[0])}
             # return audio_resampled
     
     def __len__(self):

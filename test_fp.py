@@ -90,6 +90,7 @@ def create_table(hit_rates, overlap, dur, test_seq_len=[1,3,5,9,11,19], text="te
 def create_fp_db(dataloader, augment, model, output_root_dir, verbose=True):
     fp_q = []
     fp_db = []
+    meta_list = []
     print("=> Creating query and db fingerprints...")
     for idx, (audio, meta) in enumerate(dataloader):
         audio = audio.to(device)
@@ -99,6 +100,11 @@ def create_fp_db(dataloader, augment, model, output_root_dir, verbose=True):
 
         fp_db.append(z_i.detach().cpu().numpy())
         fp_q.append(z_j.detach().cpu().numpy())
+        
+        # Repeat metadata for each segment in the batch
+        n_segments = z_i.shape[0]
+        for _ in range(n_segments):
+            meta_list.append(meta['song'])
 
         if verbose and idx % 10 == 0:
             print(f"Step [{idx}/{len(dataloader)}]\t shape: {z_i.shape}")
@@ -126,9 +132,13 @@ def create_fp_db(dataloader, augment, model, output_root_dir, verbose=True):
     arr_db.flush(); del(arr_db)   #Close memmap
 
     np.save(f'{output_root_dir}/db_shape.npy', arr_shape)
+    
+    # Save metadata for each segment
+    np.save(f'{output_root_dir}/metadata.npy', meta_list)
 
 def create_dummy_db(dataloader, augment, model, output_root_dir, fname='dummy_db', verbose=True):
     fp = []
+    meta_list = []
     print("=> Creating dummy fingerprints...")
     for idx, (audio, meta)  in enumerate(dataloader):
         audio = audio.to(device)
@@ -144,6 +154,11 @@ def create_dummy_db(dataloader, augment, model, output_root_dir, fname='dummy_db
                 _, _, z_i, _= model(x_i.to(device),x_i.to(device))  
 
             fp.append(z_i.detach().cpu().numpy())
+            
+            # Repeat metadata for each segment in the chunk
+            n_segments = z_i.shape[0]
+            for _ in range(n_segments):
+                meta_list.append(meta['song'])
         
         if verbose and idx % 100 == 0:
             print(f"Step [{idx}/{len(dataloader)}]\t shape: {z_i.shape}")
@@ -159,6 +174,9 @@ def create_dummy_db(dataloader, augment, model, output_root_dir, fname='dummy_db
     arr.flush(); del(arr)   #Close memmap
 
     np.save(f'{output_root_dir}/{fname}_shape.npy', arr_shape)
+    
+    # Save metadata for each segment
+    np.save(f'{output_root_dir}/{fname}_metadata.npy', meta_list)
 
 
 def main():
@@ -279,7 +297,7 @@ def main():
         args.query_lens = [int(q) for q in args.query_lens.split(',')]
         test_seq_len = [query_len_from_seconds(q, cfg['overlap'], dur=cfg['dur'])
                         for q in args.query_lens]
-        
+    
     for ckp_name, epochs in test_cfg.items():
         if not type(epochs) == list:
             epochs = [epochs]
@@ -313,7 +331,6 @@ def main():
             create_fp_db(query_db_loader, augment=test_augment, 
                          model=model, output_root_dir=fp_dir, verbose=False)
             
-            
             text = f'{args.text}_{str(epoch)}'
             label = epoch if type(epoch) == int else 0
 
@@ -332,6 +349,7 @@ def main():
                                 label)
   
             else:
+                
                 hit_rates = eval_faiss(emb_dir=fp_dir, 
                                     test_ids=args.test_ids, 
                                     index_type=index_type,

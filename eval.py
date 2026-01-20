@@ -5,6 +5,17 @@ import time
 import numpy as np
 import os
 import uuid
+import json
+
+def to_json_safe(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: to_json_safe(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_json_safe(v) for v in obj]
+    else:
+        return obj
 
 def get_index(index_type,
               train_data,
@@ -127,11 +138,13 @@ def load_memmap_data(source_dir,
                      fname,
                      append_extra_length=None,
                      shape_only=False,
+                     load_metadata=True,
                      display=True):
     """
     Load data and datashape from the file path.
     • Get shape from [source_dir/fname_shape.npy}.
     • Load memmap data from [source_dir/fname.mm].
+    • Optionally load metadata from [source_dir/fname_metadata.npy] or [source_dir/metadata.npy].
     Parameters
     ----------
     source_dir : (str)
@@ -142,11 +155,13 @@ def load_memmap_data(source_dir,
         file will be opened as 'r+' mode.
     shape_only : (bool), optional
         Return only shape. The default is False.
+    load_metadata : (bool), optional
+        If True, also load and return the metadata file. The default is False.
     display : (bool), optional
         The default is True.
     Returns
     -------
-    (data, data_shape)
+    (data, data_shape) or (data, data_shape, metadata) if load_metadata=True
     """
     path_shape = os.path.join(source_dir, fname + '_shape.npy')
     path_data = os.path.join(source_dir, fname + '.mm')
@@ -165,6 +180,23 @@ def load_memmap_data(source_dir,
     data[np.isnan(data)] = 0.0
     if display:
         print(f'Load {data_shape[0]:,} items from \033[32m{path_data}\033[0m.')
+    
+    if load_metadata:
+        # Try fname_metadata.npy first (for dummy_db), then metadata.npy (for query/db)
+        path_metadata = os.path.join(source_dir, fname + '_metadata.npy')
+        if not os.path.exists(path_metadata):
+            path_metadata = os.path.join(source_dir, 'metadata.npy')
+        
+        if os.path.exists(path_metadata):
+            metadata = np.load(path_metadata, allow_pickle=True)
+            if display:
+                print(f'Load {len(metadata):,} metadata items from \033[32m{path_metadata}\033[0m.')
+            return data, data_shape, metadata
+        else:
+            if display:
+                print(f'Warning: No metadata file found for {fname}.')
+            return data, data_shape, None
+    
     return data, data_shape
 
 def eval_faiss(emb_dir,
@@ -183,12 +215,12 @@ def eval_faiss(emb_dir,
         test_seq_len = np.asarray(
             list(map(int, test_seq_len.split())))  # '1 3 5' --> [1, 3, 5]
 
-    # Load items from {query, db, dummy_db}
-    query, query_shape = load_memmap_data(emb_dir, 'query')
-    db, db_shape = load_memmap_data(emb_dir, 'db')
+    # Load items from {query, db, dummy_db} with metadata
+    query, query_shape, _ = load_memmap_data(emb_dir, 'query')
+    db, db_shape, db_metadata = load_memmap_data(emb_dir, 'db')
     if emb_dummy_dir is None:
         emb_dummy_dir = emb_dir
-    dummy_db, dummy_db_shape = load_memmap_data(emb_dummy_dir, 'dummy_db')
+    dummy_db, dummy_db_shape, dummy_db_metadata = load_memmap_data(emb_dummy_dir, 'dummy_db')
     """ ----------------------------------------------------------------------
     FAISS index setup
         dummy: 10 items.
@@ -202,7 +234,13 @@ def eval_faiss(emb_dir,
                                        [q0,  q1,  q2,  q3,  q4]
     • The set of ground truth IDs for q[i] will be (i + len(dummy_db))
     ---------------------------------------------------------------------- """
-    # Create and train FAISS index
+    # Merge metadata: [dummy_db_metadata | db_metadata] to mirror FAISS index structure
+    if dummy_db_metadata is not None and db_metadata is not None:
+        merged_metadata = np.concatenate([dummy_db_metadata, db_metadata])
+    else:
+        merged_metadata = None
+        
+    # Create and train FAISS index, initially empty
     index = get_index(index_type, dummy_db, dummy_db.shape, (not nogpu),
                       max_train, n_centroids=n_centroids)
 
@@ -227,7 +265,7 @@ def eval_faiss(emb_dir,
     del dummy_db
     start_time = time.time()
 
-    fake_recon_index, index_shape = load_memmap_data(
+    fake_recon_index, index_shape, _ = load_memmap_data(
         emb_dummy_dir, 'dummy_db', append_extra_length=query_shape[0],
         display=False)
     fake_recon_index[dummy_db_shape[0]:dummy_db_shape[0] + query_shape[0], :] = db[:, :]
@@ -257,7 +295,11 @@ def eval_faiss(emb_dir,
     top3_exact = np.zeros((n_test, len(test_seq_len))).astype(int)
     top10_exact = np.zeros((n_test, len(test_seq_len))).astype(int)
     # top1_song = np.zeros((n_test, len(test_seq_len))).astype(np.int)
-
+    
+    # Store ground truth and predicted IDs for each evaluation
+    gt_id_results = np.zeros(n_test).astype(int)  # shape: (n_test,)
+    pred_id_results = np.zeros((n_test, len(test_seq_len))).astype(int)  # shape: (n_test, n_seq_len)
+    # test_seq_len = #consecutive segments used for matching
     start_time = time.time()
     for ti, test_id in enumerate(test_ids):
         gt_id = gt_ids[ti]
@@ -289,6 +331,10 @@ def eval_faiss(emb_dir,
             """ Evaluate """
             pred_ids = candidates[np.argsort(-_scores)[:10]]
             # pred_id = candidates[np.argmax(_scores)] <-- only top1-hit
+            
+            # Store ground truth and predicted IDs
+            gt_id_results[ti] = gt_id
+            pred_id_results[ti, si] = pred_ids[0]
 
             # top1 hit
             top1_exact[ti, si] = int(gt_id == pred_ids[0])
@@ -320,14 +366,27 @@ def eval_faiss(emb_dir,
         print(f'Failed to create directory {result_dir}.')
         result_dir = emb_dir + f'/{str(uuid.uuid4().hex)[:16]}'
 
-
+    print(f'saving results in {result_dir}')
     np.save(f'{result_dir}/hit_rates.npy', hit_rates)
 
     np.save(f'{result_dir}/raw_score.npy',
             np.concatenate(
                 (top1_exact, top1_near, top3_exact, top10_exact), axis=1))
-    np.save(f'{emb_dir}/test_ids.npy', test_ids)
+    np.save(f'{result_dir}/test_ids.npy', test_ids)
+    
+    # Save ground truth and predicted IDs
+    np.save(f'{result_dir}/pred_ids.npy', pred_id_results)
+    
     print(f'Saved test_ids, hit-rates and raw score to {result_dir}.')
 
-    return hit_rates
+    # Convert result IDs to metadata and save as JSON
+    if merged_metadata is not None:
+        gt_metadata_results = [merged_metadata[idx].item() for idx in gt_id_results]
+        with open(f'{result_dir}/gt_ids.json', 'w') as f:
+            json.dump(to_json_safe(gt_metadata_results), f, indent=2)
 
+        pred_metadata_results = [[merged_metadata[idx].tolist() for idx in row] for row in pred_id_results]
+        with open(f'{result_dir}/pred_ids.json', 'w') as f:
+            json.dump(pred_metadata_results, f, indent=2)
+    
+    return hit_rates

@@ -5,4 +5,5 @@ fma_small/
 venv/
 aug/
 bin/
-
+logs/
+runs/
