@@ -334,6 +334,7 @@ def eval_faiss(emb_dir,
             
             # Store ground truth and predicted IDs
             gt_id_results[ti] = gt_id
+            # ? increase to top3, 5 or 10 predictions
             pred_id_results[ti, si] = pred_ids[0]
 
             # top1 hit

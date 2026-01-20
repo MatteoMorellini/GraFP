@@ -44,8 +44,12 @@ def load_index(cfg, data_dir, ext=['wav','mp3'], shuffle_dataset=True, mode="tra
     if shuffle_dataset :
         np.random.seed(42)
         np.random.shuffle(indices)
+
+    # how many songs to include in the validation/test dataset
     if mode == "train":
         size = cfg['train_sz']
+    elif mode == 'inference':
+        size = -1
     else:
         size = cfg['val_sz']
     dataset = {str(i):fpaths[ix] for i,ix in enumerate(indices[:size])}

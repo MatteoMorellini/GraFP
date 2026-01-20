@@ -7,3 +7,4 @@ aug/
 bin/
 logs/
 runs/
+inference/

@@ -106,8 +106,8 @@ def create_fp_db(dataloader, augment, model, output_root_dir, verbose=True):
         for _ in range(n_segments):
             meta_list.append(meta['song'])
 
-        if verbose and idx % 10 == 0:
-            print(f"Step [{idx}/{len(dataloader)}]\t shape: {z_i.shape}")
+        #if verbose and idx % 10 == 0:
+        print(f"Step [{idx}/{len(dataloader)}]\t shape: {z_i.shape}")
     
     fp_db = np.concatenate(fp_db)
     fp_q = np.concatenate(fp_q)

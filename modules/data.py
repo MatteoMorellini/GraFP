@@ -14,7 +14,7 @@ from util import load_index, get_frames, qtile_normalize, qtile_norm
 
 
 class NeuralfpDataset(Dataset):
-    def __init__(self, cfg, path, transform=None, train=False):
+    def __init__(self, cfg, path, transform=None, train=False, inference = False):
         self.path = path
         self.transform = transform
         self.train = train
@@ -28,6 +28,8 @@ class NeuralfpDataset(Dataset):
         print(f'path is {path}')
         if train:
             self.filenames = load_index(cfg, path, mode="train")
+        elif inference:
+            self.filenames = load_index(cfg, path, mode="inference")
         else:
             self.filenames = load_index(cfg, path, mode="valid")
 
