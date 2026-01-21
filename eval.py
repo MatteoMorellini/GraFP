@@ -129,7 +129,9 @@ def get_index(index_type,
         index.train(train_data) # Actually do nothing for {'l2', 'hnsw'}
     print('Elapsed time: {:.2f} seconds.'.format(time.time() - start_time))
 
-    # N probe
+    # N probe = nearest clusters (measured in distance to their centroids) 
+    # from which we take the closest sample
+    # e.g. nprobe = 1 -> 
     index.nprobe = 20
     return index
 
@@ -356,6 +358,7 @@ def eval_faiss(emb_dir,
     # top1_song = 100 * np.mean(top1_song[:ti + 1, :], axis=0)
 
     hit_rates = np.stack([top1_exact_rate, top1_near_rate, top3_exact_rate, top10_exact_rate])
+    print(hit_rates)
     del fake_recon_index, query, db
 
     # Create random named directory for saving results

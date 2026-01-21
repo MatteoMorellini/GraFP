@@ -32,7 +32,6 @@ class NeuralfpDataset(Dataset):
             self.filenames = load_index(cfg, path, mode="inference")
         else:
             self.filenames = load_index(cfg, path, mode="valid")
-
         print(f"Loaded {len(self.filenames)} files from {path}")
         self.ignore_idx = []
         self.error_counts = {}
@@ -116,7 +115,12 @@ class NeuralfpDataset(Dataset):
         
         #   For validation / test, output consecutive (overlapping) frames
         else:
-            return audio_resampled, {'song': str(meta.tags["TIT2"].text[0])}
+            title = ''
+            if "TIT2" in meta.tags:
+                title = str(meta.tags["TIT2"].text[0])
+
+            return audio_resampled, {"song": title}
+
             # return audio_resampled
     
     def __len__(self):

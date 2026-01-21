@@ -68,8 +68,7 @@ def predict_query(emb_dir,
     query, query_shape, query_metadata = load_memmap_data(emb_dir, 'query')
     if emb_dummy_dir is None:
         emb_dummy_dir = emb_dir
-    dummy_db, dummy_db_shape, dummy_db_metadata = load_memmap_data(emb_dummy_dir, 'dummy_db')
-
+    dummy_db, dummy_db_shape, dummy_db_metadata = load_memmap_data(emb_dummy_dir, 'db')
 
     index = get_index(index_type, dummy_db, dummy_db.shape, (not nogpu),
                       max_train, n_centroids=n_centroids)
@@ -78,7 +77,7 @@ def predict_query(emb_dir,
 
     # TODO: check if fake_recon_index is necessary or we can keep dummy_db
     fake_recon_index, index_shape, _ = load_memmap_data(
-        emb_dummy_dir, 'dummy_db',
+        emb_dummy_dir, 'db',
         display=False)
     fake_recon_index.flush()
 
@@ -236,14 +235,14 @@ def main():
 
         if args.query_lens is not None:
             predict_query(emb_dir=fp_dir,
-                                emb_dummy_dir='/content/drive/MyDrive/GraFP/logs/store/small/model_tc_27_best',
+                                emb_dummy_dir='/content/drive/MyDrive/GraFP/output',
                                 test_ids=args.test_ids, 
                                 test_seq_len=test_seq_len, 
                                 index_type=index_type,
                                 nogpu=True) 
         else:
             predict_query(emb_dir=fp_dir, 
-                                emb_dummy_dir='/content/drive/MyDrive/GraFP/logs/store/small/model_tc_27_best',
+                                emb_dummy_dir='/content/drive/MyDrive/GraFP/output',
                                 test_ids=args.test_ids, 
                                 index_type=index_type,
                                 nogpu=True)

@@ -30,11 +30,12 @@ parser.add_argument('--output_dir', default='output', type=str,
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 def create_db(dataloader, model, augment, output_dir, concat=True, max_size=128):
     fp = []
+    meta_list = []
     print("Computing fingerprints...")
     for idx, (audio, meta) in enumerate(dataloader):
+        if meta['song'] == '': continue
         audio = audio.to(device)
         x_i, _ = augment(audio, None)
         # Determining mini-batches for large audio files
@@ -46,6 +47,11 @@ def create_db(dataloader, model, augment, output_dir, concat=True, max_size=128)
 
             fp.append(z_i.detach().cpu().numpy())
 
+            # Repeat metadata for each segment in the chunk
+            n_segments = z_i.shape[0]
+            for _ in range(n_segments):
+                meta_list.append(meta['song'])
+
         if idx % 10 == 0:
             print(f"Step [{idx}/{len(dataloader)}]\t shape: {z_i.shape}")
 
@@ -55,8 +61,21 @@ def create_db(dataloader, model, augment, output_dir, concat=True, max_size=128)
     else:
         fp = np.array(fp)
 
-    os.makedirs("output", exist_ok=True)
+    arr_shape = (len(fp), z_i.shape[-1])
+
+    os.makedirs(output_dir, exist_ok=True)
+    arr = np.memmap(f'{output_dir}/db.mm',
+                    dtype='float32',
+                    mode='w+',
+                    shape=arr_shape)
+    arr[:] = fp[:]
+    arr.flush(); del(arr)   #Close memmap
+
+    np.save(f'{output_dir}/db_shape.npy', arr_shape)
+    np.save(f'{output_dir}/db_metadata.npy', meta_list)
+    
     np.save(os.path.join(output_dir, "fingerprints.npy"), fp)
+    
     
 
 def main():
@@ -75,7 +94,7 @@ def main():
     else:
         model = model.to(device)
 
-    dataset = NeuralfpDataset(cfg, path=args.test_dir, train=False)
+    dataset = NeuralfpDataset(cfg, path=args.test_dir, train=False, inference=True)
     db_loader = torch.utils.data.DataLoader(dataset, batch_size=1, 
                                             shuffle=False,
                                             num_workers=4, 

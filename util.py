@@ -31,7 +31,7 @@ def load_index(cfg, data_dir, ext=['wav','mp3'], shuffle_dataset=True, mode="tra
         raise FileNotFoundError(f"Directory {data_dir} not found")
     
     json_path = os.path.join(cfg['data_dir'], data_dir.split('/')[-1] + ".json")
-    if os.path.exists(json_path):
+    if os.path.exists(json_path) and mode != 'inference':
         print(f"Loading indices from {json_path}")
         with open(json_path, 'r') as fp:
             dataset = json.load(fp)
@@ -49,13 +49,15 @@ def load_index(cfg, data_dir, ext=['wav','mp3'], shuffle_dataset=True, mode="tra
     if mode == "train":
         size = cfg['train_sz']
     elif mode == 'inference':
-        size = -1
+        size = len(indices)+1
     else:
         size = cfg['val_sz']
+    print("len before:", len(indices))
     dataset = {str(i):fpaths[ix] for i,ix in enumerate(indices[:size])}
-
-    with open(json_path, 'w') as fp:
-        json.dump(dataset, fp)
+    print('len after:', len(dataset))
+    if mode != 'inference':
+        with open(json_path, 'w') as fp:
+            json.dump(dataset, fp)
 
     return dataset
 
